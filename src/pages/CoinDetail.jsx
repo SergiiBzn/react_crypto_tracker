@@ -1,0 +1,210 @@
+import { Link, useNavigate, useParams } from 'react-router';
+import { fetchChartData, fetchCoinData } from '../api/coinGecko';
+import { useEffect, useState } from 'react';
+import { formatMarketCap, formatPrice } from '../utils/formatter';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+
+export const CoinDetail = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [coin, setCoin] = useState(null);
+  const [isLoading, setLoading] = useState(true);
+  const [chartData, setChartData] = useState([]);
+
+  useEffect(() => {
+    loadCoinData();
+    loadChartData();
+  }, [id]);
+
+  const loadCoinData = async () => {
+    try {
+      const data = await fetchCoinData(id);
+      setCoin(data);
+    } catch (error) {
+      console.error('Error fetching cryptocurrency data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadChartData = async () => {
+    try {
+      const data = await fetchChartData(id);
+
+      const formattedData = data.prices.map((entry) => ({
+        time: new Date(entry[0]).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        }),
+        price: entry[1].toFixed(2),
+      }));
+
+      setChartData(formattedData);
+    } catch (error) {
+      console.error('Error fetching cryptocurrency data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className='app'>
+        <div className='loading'>
+          <div className='spinner'></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!coin) {
+    return (
+      <div className='app'>
+        <div className='no-results'>
+          <p>Coin not found</p>
+          <button onClick={() => navigate('/')} className='back-button'>
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const priceChange = coin.market_data.price_change_percentage_24h || 0;
+  const isPositive = priceChange >= 0;
+
+  return (
+    <div className='app'>
+      <header className='header'>
+        <div className='header-content'>
+          <div className='logo-section'>
+            <Link to='/' className='logo-link'>
+              <h1>Crypto Tracker</h1>
+              <p>Track the latest cryptocurrency prices and market data.</p>
+            </Link>
+          </div>
+          <button onClick={() => navigate('/')} className='back-button'>
+            Go Back
+          </button>
+        </div>
+      </header>
+
+      <div className='coin-detail'>
+        <div className='coin-header'>
+          <div className='coin-title'>
+            <img src={coin.image.large} alt={coin.name} />
+            <div>
+              <h1>{coin.name}</h1>
+              <p className='symbol'>{coin.symbol.toUpperCase()}</p>
+            </div>
+          </div>
+          <span className='rank'>Rank # {coin.market_cap_rank}</span>
+        </div>
+
+        <div className='coin-price-section'>
+          <div className='current-price'>
+            <h2 className='price'>
+              {formatPrice(coin.market_data.current_price.eur)}
+            </h2>
+            <span
+              className={`change-badge ${isPositive ? 'positive' : 'negative'}`}
+            >
+              {isPositive ? '↑' : '↓'} {Math.abs(priceChange).toFixed(2)}%
+            </span>
+          </div>
+          <div className='price-ranges'>
+            <div className='proce-range'>
+              <span className='range-label'>24h High</span>
+              <span className='range-value'>
+                {formatPrice(coin.market_data.high_24h.eur)}
+              </span>
+            </div>
+            <div className='proce-range'>
+              <span className='range-label'>24h High</span>
+              <span className='range-value'>
+                {formatPrice(coin.market_data.low_24h.eur)}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className='chart-section'>
+          <h3>Price Chart (7 Days)</h3>
+          <ResponsiveContainer width='100%' height={400}>
+            <LineChart data={chartData}>
+              <CartesianGrid
+                strokeDasharray='3 3'
+                stroke='rgba(255,255,255,0.1)'
+              />
+
+              <XAxis
+                dataKey='time'
+                stroke='#8884d8'
+                style={{ fontSize: '12px' }}
+              />
+              <YAxis
+                stroke='#8884d8'
+                style={{ fontSize: '12px' }}
+                domain={['auto', 'auto']}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#333',
+                  borderRadius: '5px',
+                  border: '1px solid #555',
+                  color: '#fff',
+                }}
+              />
+
+              <Line
+                type='monotone'
+                dataKey='price'
+                stroke='#8884d8'
+                strokeWidth={2}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className='stats-grid'>
+          <div className='stat-card'>
+            <span className='stat-label'>Market Cap</span>
+            <span className='stat-value'>
+              €{formatMarketCap(coin.market_data.market_cap.eur)}
+            </span>
+          </div>
+
+          <div className='stat-card'>
+            <span className='stat-label'>Volume (24h)</span>
+            <span className='stat-value'>
+              €{formatMarketCap(coin.market_data.total_volume.eur)}
+            </span>
+          </div>
+
+          <div className='stat-card'>
+            <span className='stat-label'>Circulating Supply</span>
+            <span className='stat-value'>
+              {coin.market_data.circulating_supply.toLocaleString() || 'N/A'}
+            </span>
+          </div>
+
+          <div className='stat-card'>
+            <span className='stat-label'>Total Supply</span>
+            <span className='stat-value'>
+              {coin.market_data.total_supply?.toLocaleString() || 'N/A'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
